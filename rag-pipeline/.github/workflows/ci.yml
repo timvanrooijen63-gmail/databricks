@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          # Python 3.11 matches Databricks Runtime 15.x LTS
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run unit tests
+        run: pytest tests/ -v
+
+      - name: Lint notebooks (syntax check)
+        run: |
+          python -m py_compile notebooks/01_setup.py
+          python -m py_compile notebooks/02_driver.py
+          python -m py_compile notebooks/03_log_and_register.py

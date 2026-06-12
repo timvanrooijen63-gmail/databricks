@@ -1,0 +1,14 @@
+# Core Databricks libraries
+# Use --upgrade in notebooks (%pip install --upgrade) to override stale runtime versions.
+databricks-langchain>=0.4.0
+databricks-vectorsearch>=0.40
+
+# MLflow 2.17+ is required for mlflow.genai.register_prompt / set_prompt_alias
+mlflow>=2.17.0
+
+# LangChain
+langchain>=0.3.0
+langchain-core>=0.3.0
+
+# Testing
+pytest>=8.0
