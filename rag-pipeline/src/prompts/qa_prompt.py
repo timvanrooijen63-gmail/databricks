@@ -7,7 +7,7 @@ The key pattern for the exam:
   - Promoting a prompt = moving the alias.  No code change, no redeployment.
   - Rolling back = moving the alias to a previous version number.
 
-Requires mlflow >= 2.17 for mlflow.genai.register_prompt / set_prompt_alias.
+Requires mlflow >= 3.x for mlflow.genai.register_prompt / set_prompt_alias.
 """
 import mlflow
 
