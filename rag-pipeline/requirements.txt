@@ -1,14 +1,16 @@
 # Core Databricks libraries
-# Use --upgrade in notebooks (%pip install --upgrade) to override stale runtime versions.
-databricks-langchain>=0.4.0
-databricks-vectorsearch>=0.40
+# Pinned floor = last version verified by the test suite; capped at the next
+# major to keep CI and the Databricks %pip install (notebooks/01_setup.py) in
+# the same band. Keep this list in sync with that notebook's %pip line.
+databricks-langchain>=0.20.0,<1.0.0
+databricks-vectorsearch>=0.75,<1.0
 
-# MLflow 2.17+ is required for mlflow.genai.register_prompt / set_prompt_alias
-mlflow>=2.17.0
+# MLflow 3.x provides mlflow.genai.register_prompt / set_prompt_alias.
+mlflow>=3.13.0,<4.0.0
 
-# LangChain
-langchain>=0.3.0
-langchain-core>=0.3.0
+# LangChain 1.x (verified by tests; floor raised from the old 0.3 range).
+langchain>=1.3.8,<2.0.0
+langchain-core>=1.4.6,<2.0.0
 
-# Testing
-pytest>=8.0
+# Testing (not installed on Databricks clusters).
+pytest>=8.0,<10.0

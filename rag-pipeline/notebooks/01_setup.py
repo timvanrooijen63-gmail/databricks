@@ -4,7 +4,9 @@
 
 # COMMAND ----------
 
-# %pip install --upgrade databricks-langchain databricks-vectorsearch mlflow langchain langchain-core
+# Versions kept in sync with requirements.txt so the cluster and CI resolve the
+# same band. --upgrade still grabs the latest within each range.
+# %pip install --upgrade "databricks-langchain>=0.20.0,<1.0.0" "databricks-vectorsearch>=0.75,<1.0" "mlflow>=3.13.0,<4.0.0" "langchain>=1.3.8,<2.0.0" "langchain-core>=1.4.6,<2.0.0"
 
 # COMMAND ----------
 
