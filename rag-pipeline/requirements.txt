@@ -1,26 +1,29 @@
 # Docs agent dependencies.
-# Pinned floor = a version known to expose the APIs used here; capped at the next
-# major to keep CI and the Databricks %pip install (notebooks/register_agent.py)
-# in the same band. The notebook installs with --upgrade, so the served runtime
-# may be newer — keep these ranges compatible with that.
+# Pins reflect the set that actually resolves together (verified locally with
+# `uv pip install`). Floor = the resolved version; capped at the next major to
+# keep CI and the Databricks %pip install (notebooks/register_agent.py) in the
+# same band. The notebook installs with --upgrade, so the served runtime may be
+# newer — keep these ranges compatible with that.
 
 # ChatDatabricks + DatabricksMCPServer + DatabricksMultiServerMCPClient.
 databricks-langchain>=0.20.0,<1.0.0
 
 # DatabricksMCPClient.get_databricks_resources() (for logging) + MCP transport.
-databricks-mcp>=0.4.0,<1.0.0
+databricks-mcp>=0.9.0,<1.0.0
 
-# create_react_agent (the ReAct agent loop).
-langgraph>=0.3.0,<1.0.0
+# create_react_agent (the ReAct agent loop). LangGraph is on the 1.x line.
+langgraph>=1.0.0,<2.0.0
 
-# MLflow 3.x: ResponsesAgent interface + model-from-code logging.
-mlflow>=3.13.0,<4.0.0
+# MLflow: ResponsesAgent interface + model-from-code logging. Capped below 3.13
+# because databricks-agents 1.x excludes mlflow 3.13.x (it allows <=3.12 or
+# >=3.14); 3.12 has everything we use (ResponsesAgent, create_text_output_item).
+mlflow>=3.11.0,<3.13.0
 
-# Agent Framework: agents.deploy() to Model Serving.
-databricks-agents>=0.16.0,<1.0.0
+# Agent Framework: agents.deploy() to Model Serving. On the 1.x line.
+databricks-agents>=1.11.0,<2.0.0
 
 # WorkspaceClient (usually transitive via the above; pinned for clarity).
-databricks-sdk>=0.30.0,<1.0.0
+databricks-sdk>=0.117.0,<1.0.0
 
 # Testing (not installed on Databricks clusters).
 pytest>=8.0,<10.0

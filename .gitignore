@@ -15,6 +15,10 @@ env/
 # uv
 .uv/
 
+# MLflow (local tracking artifacts created by test/dev runs)
+mlruns/
+mlflow.db
+
 # Testing / coverage
 .pytest_cache/
 .coverage

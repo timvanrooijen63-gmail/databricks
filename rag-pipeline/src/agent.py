@@ -44,10 +44,8 @@ MCP_SERVER_PATH = "/api/2.0/mcp/ai-search/workspace/default"
 # Optional grounding instruction (an addition beyond the bare API spec): keeps
 # answers tied to retrieved documents rather than the model's prior knowledge.
 SYSTEM_PROMPT = (
-    "You are a documentation assistant. Answer the user's question using only "
-    "the information returned by the available search tools, which query our "
-    "Databricks AI Search index. If the answer is not contained in the "
-    "retrieved documents, say that you don't know."
+    "You are a assistent that answers questions on house sales based on purchase agreements." \
+    "Do not make stuff up. Verify all questions. Only answer questions related to house sales"
 )
 
 
@@ -64,10 +62,13 @@ class DocsAgent(ResponsesAgent):
         self.llm = ChatDatabricks(endpoint=LLM_ENDPOINT_NAME)
 
     def _build_mcp_client(self) -> DatabricksMultiServerMCPClient:
-        # Built fresh for each request so the MCP session is opened and closed
-        # within the request. A module-level ``async with`` context would leave a
-        # session open across the model-serving process lifetime, which is not
-        # safe under concurrent requests.
+        # Built fresh for each request. NOTE: as of langchain-mcp-adapters 0.1.0
+        # (pulled in by databricks-langchain 0.20.0) MultiServerMCPClient is NO
+        # LONGER a context manager — `async with client` raises NotImplementedError.
+        # Instead you call `await client.get_tools()` directly, and the returned
+        # tools open a fresh, short-lived MCP session per invocation. That is
+        # precisely the per-request behavior we want under model serving (no
+        # module-level/long-lived open session), so we don't manage one ourselves.
         return DatabricksMultiServerMCPClient(
             [
                 DatabricksMCPServer(
@@ -80,19 +81,19 @@ class DocsAgent(ResponsesAgent):
 
     async def discover_tools(self) -> list[Any]:
         """List the tools exposed by the MCP server (used by the smoke test)."""
-        async with self._build_mcp_client() as client:
-            return await client.get_tools()
+        client = self._build_mcp_client()
+        return await client.get_tools()
 
     async def _arun(self, messages: list[dict]) -> list[Any]:
-        # Open the MCP session, discover tools at runtime, build the ReAct agent,
-        # invoke it, and let the session close — all inside one request.
-        async with self._build_mcp_client() as client:
-            tools = await client.get_tools()
-            agent = create_react_agent(self.llm, tools=tools, prompt=SYSTEM_PROMPT)
-            result = await agent.ainvoke({"messages": messages})
-            # LangGraph returns the full message history; we hand it all back so
-            # predict() can pick the final assistant turn.
-            return result["messages"]
+        # Discover tools at runtime, build the ReAct agent, and invoke it. Each
+        # tool call manages its own MCP session internally (see _build_mcp_client).
+        client = self._build_mcp_client()
+        tools = await client.get_tools()
+        agent = create_react_agent(self.llm, tools=tools, prompt=SYSTEM_PROMPT)
+        result = await agent.ainvoke({"messages": messages})
+        # LangGraph returns the full message history; we hand it all back so
+        # predict() can pick the final assistant turn.
+        return result["messages"]
 
     @staticmethod
     def _to_chat_messages(request: ResponsesAgentRequest) -> list[dict]:
