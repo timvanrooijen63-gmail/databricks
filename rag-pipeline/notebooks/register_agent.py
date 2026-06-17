@@ -25,35 +25,57 @@ import os
 import mlflow
 from databricks.sdk import WorkspaceClient
 from databricks_mcp import DatabricksMCPClient
-from mlflow.models.resources import DatabricksServingEndpoint
+from mlflow.models.resources import (
+    DatabricksServingEndpoint,
+    DatabricksVectorSearchIndex,
+)
 
 # Register models into Unity Catalog (not the workspace registry).
 mlflow.set_registry_uri("databricks-uc")
 
 # --- Fixed config (do not change) -------------------------------------------
 LLM_ENDPOINT_NAME = "claude"
+INDEX_NAME = "workspace.default.docs_index"
 UC_MODEL_NAME = "workspace.default.docs_agent"
 
 ws = WorkspaceClient()
 host = ws.config.host
 # Managed MCP server fronting the AI Search index workspace.default.docs_index.
+# This is the URL the served agent uses at runtime (src/agent.py).
 MCP_SERVER_URL = f"{host}/api/2.0/mcp/ai-search/workspace/default"
 
 # COMMAND ----------
 
-# GOVERNANCE (critical): the resources list must include the "claude" serving
-# endpoint AND the docs_index. get_databricks_resources() introspects the MCP
-# server and returns the underlying index resource(s); without both, the deployed
-# endpoint will lack permission to call the LLM or query the index.
+# GOVERNANCE (critical): the resources list MUST include the "claude" serving
+# endpoint AND the docs_index, or the deployed endpoint can't call the LLM or
+# query the index.
+#
+# Subtlety verified locally (Jun 2026): DatabricksMCPClient.get_databricks_resources()
+# only parses the canonical ".../mcp/vector-search/<catalog>/<schema>" URL form.
+# For the fixed-config ".../mcp/ai-search/..." URL above it returns [] (and logs
+# an error) — which would silently drop the index from the resources list. The
+# ai-search and vector-search URLs resolve to the SAME index, so we introspect
+# with the vector-search form to obtain the docs_index resource, and fall back to
+# declaring it explicitly if introspection ever comes back empty.
 resources = [DatabricksServingEndpoint(endpoint_name=LLM_ENDPOINT_NAME)]
-resources += DatabricksMCPClient(
-    server_url=MCP_SERVER_URL,
+
+VS_MCP_URL = f"{host}/api/2.0/mcp/vector-search/workspace/default"
+index_resources = DatabricksMCPClient(
+    server_url=VS_MCP_URL,
     workspace_client=ws,
 ).get_databricks_resources()
+if not index_resources:  # safety net — never deploy without the index resource
+    index_resources = [DatabricksVectorSearchIndex(index_name=INDEX_NAME)]
+resources += index_resources
 
 print("Logging with resources:")
 for r in resources:
-    print(f"  - {r}")
+    print(f"  - {type(r).__name__}: {r.to_dict()}")
+
+# Fail fast if governance is not satisfied.
+_dumps = [r.to_dict() for r in resources]
+assert any("serving_endpoint" in d for d in _dumps), "claude serving endpoint missing"
+assert any("vector_search_index" in d for d in _dumps), "docs_index missing"
 
 # COMMAND ----------
 
