@@ -12,7 +12,12 @@ databricks-langchain>=0.20.0,<1.0.0
 databricks-mcp>=0.9.0,<1.0.0
 
 # create_react_agent (the ReAct agent loop). LangGraph is on the 1.x line.
-langgraph>=1.0.0,<2.0.0
+# Pin the sub-packages together: langgraph-prebuilt provides create_react_agent
+# and imports ExecutionInfo from langgraph.runtime, which only exists in matching
+# langgraph core — a skew raises ImportError at model import/serve time.
+langgraph>=1.2.5,<2.0.0
+langgraph-prebuilt>=1.1.0,<2.0.0
+langgraph-checkpoint>=4.1.1,<5.0.0
 
 # MLflow: ResponsesAgent interface + model-from-code logging. Capped below 3.13
 # because databricks-agents 1.x excludes mlflow 3.13.x (it allows <=3.12 or

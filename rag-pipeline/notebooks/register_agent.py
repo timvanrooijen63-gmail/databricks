@@ -12,7 +12,14 @@
 
 # COMMAND ----------
 
-# MAGIC %pip install --upgrade databricks-langchain databricks-mcp langgraph mlflow databricks-agents
+# MAGIC %pip install --upgrade databricks-langchain==0.20.0 databricks-mcp==0.9.0 langgraph==1.2.5 langgraph-prebuilt==1.1.0 langgraph-checkpoint==4.1.1 mlflow==3.12.0 databricks-agents==1.11.0
+# MAGIC
+# MAGIC # Versions pinned to a set verified end-to-end (Jun 2026). The langgraph
+# MAGIC # sub-packages (langgraph-prebuilt, langgraph-checkpoint) MUST be pinned
+# MAGIC # alongside langgraph core: a bare `--upgrade langgraph` leaves the
+# MAGIC # cluster's preinstalled langgraph-prebuilt out of sync, and
+# MAGIC # create_react_agent then fails with
+# MAGIC #   "cannot import name 'ExecutionInfo' from 'langgraph.runtime'".
 
 # COMMAND ----------
 
@@ -90,20 +97,32 @@ input_example = {
     "input": [{"role": "user", "content": "Who was the buyer of the house?"}]
 }
 
+# Pin the serving environment to EXACTLY what is installed in this notebook
+# (post-%pip). This is what prevents the served container from drifting — in
+# particular it pins the langgraph sub-packages together, avoiding the
+# "cannot import name 'ExecutionInfo' from 'langgraph.runtime'" skew.
+from importlib.metadata import version
+
+pip_requirements = [
+    f"{pkg}=={version(pkg)}"
+    for pkg in [
+        "databricks-langchain",
+        "databricks-mcp",
+        "langgraph",
+        "langgraph-prebuilt",
+        "langgraph-checkpoint",
+        "mlflow",
+    ]
+]
+print("pip_requirements:", pip_requirements)
+
 with mlflow.start_run():
     logged = mlflow.pyfunc.log_model(
         name="agent",
         python_model=AGENT_SCRIPT,
         resources=resources,
         input_example=input_example,
-        # Keep the serving environment in the same dependency band as
-        # requirements.txt / the %pip cell above.
-        pip_requirements=[
-            "databricks-langchain",
-            "databricks-mcp",
-            "langgraph",
-            "mlflow",
-        ],
+        pip_requirements=pip_requirements,
     )
 
 print(f"Logged model URI: {logged.model_uri}")
