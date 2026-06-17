@@ -16,6 +16,7 @@ Wrapper shape follows the official Databricks examples:
   - https://docs.databricks.com/aws/en/generative-ai/agent-framework/unstructured-retrieval-tools
 """
 import asyncio
+import concurrent.futures
 from typing import Any, Generator
 
 import mlflow
@@ -40,6 +41,26 @@ LLM_ENDPOINT_NAME = "claude"
 # workspace.default.docs_index. Joined to the workspace host at runtime so the
 # same code works across workspaces without hardcoding a host.
 MCP_SERVER_PATH = "/api/2.0/mcp/ai-search/workspace/default"
+
+def _run_coro(coro):
+    """Run an async coroutine to completion from sync code, even if an event
+    loop is already running on this thread.
+
+    ``asyncio.run()`` raises "cannot be called from a running event loop" when a
+    loop is already active — which is the case inside a Databricks notebook
+    kernel (so MLflow's input_example validation at log time hits it) and can be
+    the case in some serving stacks. When a loop is running we execute the
+    coroutine in a dedicated worker thread with its own loop; otherwise we run it
+    directly. Each call builds its own MCP client (see _build_mcp_client), so no
+    async objects are shared across loops/threads.
+    """
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(coro)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+        return pool.submit(asyncio.run, coro).result()
+
 
 # Optional grounding instruction (an addition beyond the bare API spec): keeps
 # answers tied to retrieved documents rather than the model's prior knowledge.
@@ -122,9 +143,10 @@ class DocsAgent(ResponsesAgent):
         return messages
 
     def predict(self, request: ResponsesAgentRequest) -> ResponsesAgentResponse:
-        # Model Serving invokes predict() synchronously (no running event loop),
-        # so asyncio.run() is safe here to bridge into the async MCP session.
-        out_messages = asyncio.run(self._arun(self._to_chat_messages(request)))
+        # Bridge into the async MCP session. _run_coro handles being called both
+        # with and without an already-running event loop (e.g. the Databricks
+        # notebook kernel during log_model's input_example validation).
+        out_messages = _run_coro(self._arun(self._to_chat_messages(request)))
         final = out_messages[-1]
         text = getattr(final, "content", None)
         if text is None:

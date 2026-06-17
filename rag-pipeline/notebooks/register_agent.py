@@ -92,9 +92,13 @@ assert any("vector_search_index" in d for d in _dumps), "docs_index missing"
 AGENT_SCRIPT = os.path.abspath(os.path.join(os.getcwd(), "..", "src", "agent.py"))
 assert os.path.exists(AGENT_SCRIPT), f"agent.py not found at {AGENT_SCRIPT}"
 
-# A Responses-format request used to infer the model signature.
+# A Responses-format request used to infer/validate the model signature. MLflow
+# calls predict() on this example at log time, so we use a benign question: the
+# "claude" endpoint's PII/privacy output guardrail blocks answers that name
+# people (e.g. "Who was the buyer?"), which would fail logging. This neutral
+# question exercises the same code path without tripping the guardrail.
 input_example = {
-    "input": [{"role": "user", "content": "Who was the buyer of the house?"}]
+    "input": [{"role": "user", "content": "What topics can you help me with?"}]
 }
 
 # Pin the serving environment to EXACTLY what is installed in this notebook
